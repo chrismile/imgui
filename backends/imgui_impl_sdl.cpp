@@ -67,6 +67,7 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 #if defined(__APPLE__)
+#include <cmath>
 #include <TargetConditionals.h>
 #endif
 
@@ -275,6 +276,18 @@ bool ImGui_ImplSDL2_ProcessEvent(const SDL_Event* event)
                 mouse_pos.x += window_x;
                 mouse_pos.y += window_y;
             }
+            // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+            // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
+#ifdef __APPLE__
+            // Fix for high DPI mac
+            ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+            if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f)
+            {
+                // The Framebuffer is scaled by an integer ceiling of the actual ratio, so 2.0 not 1.685 on Mac!
+                mouse_pos.x *= std::ceil(platform_io.Monitors[0].DpiScale);
+                mouse_pos.y *= std::ceil(platform_io.Monitors[0].DpiScale);
+            }
+#endif
             io.AddMousePosEvent(mouse_pos.x, mouse_pos.y);
             return true;
         }
@@ -518,6 +531,18 @@ static void ImGui_ImplSDL2_UpdateMouseData()
                 mouse_x -= window_x;
                 mouse_y -= window_y;
             }
+            // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+            // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
+#ifdef __APPLE__
+            // Fix for high DPI mac
+            ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+            if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f)
+            {
+                // The Framebuffer is scaled by an integer ceiling of the actual ratio, so 2.0 not 1.685 on Mac!
+                mouse_x *= int(std::ceil(platform_io.Monitors[0].DpiScale));
+                mouse_y *= int(std::ceil(platform_io.Monitors[0].DpiScale));
+            }
+#endif
             io.AddMousePosEvent((float)mouse_x, (float)mouse_y);
         }
     }
@@ -647,6 +672,18 @@ void ImGui_ImplSDL2_NewFrame()
     io.DisplaySize = ImVec2((float)w, (float)h);
     if (w > 0 && h > 0)
         io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
+
+    // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+    // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L499
+#if defined(__APPLE__)
+    // On Apple, The window size is reported in Low DPI, even when running in high DPI mode
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f && display_h != h)
+    {
+        io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+        io.DisplaySize = ImVec2((float)display_w, (float)display_h);
+    }
+#endif
 
     // Setup time step (we don't use SDL_GetTicks() because it is using millisecond resolution)
     static Uint64 frequency = SDL_GetPerformanceFrequency();
