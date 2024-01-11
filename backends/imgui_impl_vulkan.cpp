@@ -1128,7 +1128,7 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
     IM_ASSERT(info->Device != VK_NULL_HANDLE);
     IM_ASSERT(info->Queue != VK_NULL_HANDLE);
     IM_ASSERT(info->DescriptorPool != VK_NULL_HANDLE);
-    IM_ASSERT(info->MinImageCount >= 2);
+    IM_ASSERT(info->MinImageCount >= 1);
     IM_ASSERT(info->ImageCount >= info->MinImageCount);
     if (info->UseDynamicRendering == false)
         IM_ASSERT(render_pass != VK_NULL_HANDLE);
@@ -1185,7 +1185,7 @@ void ImGui_ImplVulkan_NewFrame()
 void ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count)
 {
     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
-    IM_ASSERT(min_image_count >= 2);
+    IM_ASSERT(min_image_count >= 1);
     if (bd->VulkanInitInfo.MinImageCount == min_image_count)
         return;
 
@@ -1508,7 +1508,8 @@ void ImGui_ImplVulkanH_CreateWindowSwapChain(VkPhysicalDevice physical_device, V
 
         // We do not create a pipeline by default as this is also used by examples' main.cpp,
         // but secondary viewport in multi-viewport mode may want to create one with:
-        //ImGui_ImplVulkan_CreatePipeline(device, allocator, VK_NULL_HANDLE, wd->RenderPass, VK_SAMPLE_COUNT_1_BIT, &wd->Pipeline, bd->Subpass);
+        ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+        ImGui_ImplVulkan_CreatePipeline(device, allocator, VK_NULL_HANDLE, wd->RenderPass, VK_SAMPLE_COUNT_1_BIT, &wd->Pipeline, bd->Subpass);
     }
 
     // Create The Image Views

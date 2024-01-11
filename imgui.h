@@ -70,6 +70,7 @@ Index of this file:
 #include <stdarg.h>                 // va_list, va_start, va_end
 #include <stddef.h>                 // ptrdiff_t, NULL
 #include <string.h>                 // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp
+#include <functional>               // NOTE(Felix): for the tabbar hook (std::function)
 
 // Define attributes of all API symbols declarations (e.g. for DLL under Windows)
 // IMGUI_API is used for core imgui functions, IMGUI_IMPL_API is used for the default backends files (imgui_impl_xxx.h)
@@ -400,6 +401,7 @@ namespace ImGui
     IMGUI_API void          SetWindowSize(const char* name, const ImVec2& size, ImGuiCond cond = 0);    // set named window size. set axis to 0.0f to force an auto-fit on this axis.
     IMGUI_API void          SetWindowCollapsed(const char* name, bool collapsed, ImGuiCond cond = 0);   // set named window collapsed state
     IMGUI_API void          SetWindowFocus(const char* name);                                           // set named window to be focused / top-most. use NULL to remove focus.
+    IMGUI_API void          SetNextTabbarMenu(std::function<const char*()> hook);
 
     // Content region
     // - Retrieve available space from a given point. GetContentRegionAvail() is frequently useful.
@@ -539,6 +541,8 @@ namespace ImGui
     IMGUI_API bool          RadioButton(const char* label, int* v, int v_button);           // shortcut to handle the above pattern when value is an integer
     IMGUI_API void          ProgressBar(float fraction, const ImVec2& size_arg = ImVec2(-FLT_MIN, 0), const char* overlay = NULL);
     IMGUI_API void          Bullet();                                                       // draw a small circle + keep the cursor on the same line. advance cursor x position by GetTreeNodeToLabelSpacing(), same distance that TreeNode() uses
+    // NOTE(Felix): I added the `PlusButton'
+    IMGUI_API bool          PlusButton(const char* name, const ImVec2& pos);
 
     // Widgets: Images
     // - Read about ImTextureID here: https://github.com/ocornut/imgui/wiki/Image-Loading-and-Displaying-Examples
@@ -1060,6 +1064,7 @@ enum ImGuiWindowFlags_
     ImGuiWindowFlags_Modal                  = 1 << 27,  // Don't use! For internal use by BeginPopupModal()
     ImGuiWindowFlags_ChildMenu              = 1 << 28,  // Don't use! For internal use by BeginMenu()
     ImGuiWindowFlags_DockNodeHost           = 1 << 29,  // Don't use! For internal use by Begin()/NewFrame()
+    ImGuiWindowFlags_TabbarMenu             = 1 << 31,   // NOTE(Felix): I added this
 
     // Obsolete names
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
