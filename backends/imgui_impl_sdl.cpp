@@ -72,6 +72,10 @@
 #include <TargetConditionals.h>
 #endif
 
+// 2023-03-03 (Christoph Neuhauser): Set mouse cursor via sgl.
+#include <Utils/AppSettings.hpp>
+#include <Graphics/Window.hpp>
+
 #if SDL_VERSION_ATLEAST(2,0,4) && !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IOS)
 #define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE    1
 #else
@@ -94,7 +98,9 @@ struct ImGui_ImplSDL2_Data
     Uint64      Time;
     Uint32      MouseWindowID;
     int         MouseButtonsDown;
-    SDL_Cursor* MouseCursors[ImGuiMouseCursor_COUNT];
+    // 2023-03-03 (Christoph Neuhauser): Set mouse cursor via sgl.
+    //SDL_Cursor* MouseCursors[ImGuiMouseCursor_COUNT];
+    ImGuiMouseCursor CurrentCursor = ImGuiMouseCursor_Arrow;
     char*       ClipboardTextData;
     bool        MouseCanUseGlobalState;
     bool        UseVulkan;
@@ -368,7 +374,9 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     bool mouse_can_use_global_state = false;
 #if SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
     const char* sdl_backend = SDL_GetCurrentVideoDriver();
-    const char* global_mouse_whitelist[] = { "windows", "cocoa", "x11", "DIVE", "VMAN" };
+    // 2023-03-03 (Christoph Neuhauser): Using SDL_GetGlobalMouseState breaks x11vnc.
+    //const char* global_mouse_whitelist[] = { "windows", "cocoa", "x11", "DIVE", "VMAN" };
+    const char* global_mouse_whitelist[] = { "windows", "cocoa", "DIVE", "VMAN" };
     for (int n = 0; n < IM_ARRAYSIZE(global_mouse_whitelist); n++)
         if (strncmp(sdl_backend, global_mouse_whitelist[n], strlen(global_mouse_whitelist[n])) == 0)
             mouse_can_use_global_state = true;
@@ -397,15 +405,15 @@ static bool ImGui_ImplSDL2_Init(SDL_Window* window, void* sdl_gl_context)
     io.ClipboardUserData = NULL;
 
     // Load mouse cursors
-    bd->MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
-    bd->MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeAll] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeEW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
-    bd->MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
-    bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO);
+    //bd->MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+    //bd->MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_IBEAM);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeAll] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeEW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+    //bd->MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+    //bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NO);
 
     // Set platform dependent data in viewport
     // Our mouse update function expect PlatformHandle to be filled for the main viewport
@@ -483,8 +491,8 @@ void ImGui_ImplSDL2_Shutdown()
 
     if (bd->ClipboardTextData)
         SDL_free(bd->ClipboardTextData);
-    for (ImGuiMouseCursor cursor_n = 0; cursor_n < ImGuiMouseCursor_COUNT; cursor_n++)
-        SDL_FreeCursor(bd->MouseCursors[cursor_n]);
+    //for (ImGuiMouseCursor cursor_n = 0; cursor_n < ImGuiMouseCursor_COUNT; cursor_n++)
+    //    SDL_FreeCursor(bd->MouseCursors[cursor_n]);
 
     io.BackendPlatformName = NULL;
     io.BackendPlatformUserData = NULL;
@@ -575,17 +583,44 @@ static void ImGui_ImplSDL2_UpdateMouseCursor()
         return;
     ImGui_ImplSDL2_Data* bd = ImGui_ImplSDL2_GetBackendData();
 
+    // 2023-03-03 (Christoph Neuhauser): Set mouse cursor via sgl.
+    sgl::Window* window = sgl::AppSettings::get()->getMainWindow();
+
     ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
     if (io.MouseDrawCursor || imgui_cursor == ImGuiMouseCursor_None)
     {
         // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-        SDL_ShowCursor(SDL_FALSE);
+        //SDL_ShowCursor(SDL_FALSE);
+        window->setShowCursor(false);
     }
     else
     {
         // Show OS mouse cursor
-        SDL_SetCursor(bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow]);
-        SDL_ShowCursor(SDL_TRUE);
+        //SDL_SetCursor(bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow]);
+        //SDL_ShowCursor(SDL_TRUE);
+        sgl::CursorType cursorType = sgl::CursorType::DEFAULT;
+        if (imgui_cursor == ImGuiMouseCursor_TextInput) {
+            cursorType = sgl::CursorType::IBEAM;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeAll) {
+            cursorType = sgl::CursorType::SIZEALL;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNS) {
+            cursorType = sgl::CursorType::SIZENS;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeEW) {
+            cursorType = sgl::CursorType::SIZEWE;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNESW) {
+            cursorType = sgl::CursorType::SIZENESW;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNWSE) {
+            cursorType = sgl::CursorType::SIZENWSE;
+        } else if (imgui_cursor == ImGuiMouseCursor_Hand) {
+            cursorType = sgl::CursorType::HAND;
+        } else if (imgui_cursor == ImGuiMouseCursor_NotAllowed) {
+            cursorType = sgl::CursorType::NO;
+        }
+        if (bd->CurrentCursor != imgui_cursor) {
+            bd->CurrentCursor = imgui_cursor;
+            window->setCursorType(cursorType);
+        }
+        window->setShowCursor(true);
     }
 }
 
