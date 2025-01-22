@@ -1210,6 +1210,7 @@ enum ImGuiNextWindowDataFlags_
     ImGuiNextWindowDataFlags_HasViewport        = 1 << 10,
     ImGuiNextWindowDataFlags_HasDock            = 1 << 11,
     ImGuiNextWindowDataFlags_HasWindowClass     = 1 << 12,
+    ImGuiNextWindowDataFlags_HasTabbarMenu      = 1 << 31 // NOTE(Felix): I added this
 };
 
 // Storage for SetNexWindow** functions
@@ -1237,6 +1238,7 @@ struct ImGuiNextWindowData
     ImGuiWindowClass            WindowClass;
     ImVec2                      MenuBarOffsetMinVal;    // (Always on) This is not exposed publicly, so we don't clear it and it doesn't have a corresponding flag (could we? for consistency?)
     ImGuiWindowRefreshFlags     RefreshFlagsVal;
+    std::function<const char*()> TabbarMenu;
 
     ImGuiNextWindowData()       { memset(this, 0, sizeof(*this)); }
     inline void ClearFlags()    { Flags = ImGuiNextWindowDataFlags_None; }
@@ -2809,6 +2811,7 @@ struct IMGUI_API ImGuiWindow
     ImGuiID                 DockId;                             // Backup of last valid DockNode->ID, so single window remember their dock node id even when they are not bound any more
     ImGuiItemStatusFlags    DockTabItemStatusFlags;
     ImRect                  DockTabItemRect;
+    std::function<const char*()> TabbarMenu;
 
 public:
     ImGuiWindow(ImGuiContext* context, const char* name);
@@ -3727,6 +3730,8 @@ namespace ImGui
     IMGUI_API ImGuiID       GetWindowScrollbarID(ImGuiWindow* window, ImGuiAxis axis);
     IMGUI_API ImGuiID       GetWindowResizeCornerID(ImGuiWindow* window, int n); // 0..3: corners
     IMGUI_API ImGuiID       GetWindowResizeBorderID(ImGuiWindow* window, ImGuiDir dir);
+    // NOTE(Felix): I added the `PlusButton'
+    IMGUI_API bool          PlusButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_node);
 
     // Widgets low-level behaviors
     IMGUI_API bool          ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags = 0);

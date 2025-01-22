@@ -66,6 +66,7 @@
 // SDL
 #include <SDL3/SDL.h>
 #if defined(__APPLE__)
+#include <cmath>
 #include <TargetConditionals.h>
 #endif
 #ifdef _WIN32
@@ -74,6 +75,10 @@
 #endif
 #include <windows.h>
 #endif
+
+// 2023-03-03 (Christoph Neuhauser): Set mouse cursor via sgl.
+#include <Utils/AppSettings.hpp>
+#include <Graphics/Window.hpp>
 
 #if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IOS) && !defined(__amigaos4__)
 #define SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE    1
@@ -106,10 +111,12 @@ struct ImGui_ImplSDL3_Data
     // Mouse handling
     Uint32                  MouseWindowID;
     int                     MouseButtonsDown;
-    SDL_Cursor*             MouseCursors[ImGuiMouseCursor_COUNT];
-    SDL_Cursor*             MouseLastCursor;
+    //SDL_Cursor*             MouseCursors[ImGuiMouseCursor_COUNT];
+    //SDL_Cursor*             MouseLastCursor;
+    ImGuiMouseCursor        CurrentCursor = ImGuiMouseCursor_Arrow;
     int                     MousePendingLeaveFrame;
     bool                    MouseCanUseGlobalState;
+    bool                    MouseCanCapture;
     bool                    MouseCanReportHoveredViewport;  // This is hard to use/unreliable on SDL so we'll set ImGuiBackendFlags_HasMouseHoveredViewport dynamically based on state.
 
     // Gamepad handling
@@ -347,6 +354,19 @@ bool ImGui_ImplSDL3_ProcessEvent(const SDL_Event* event)
                 mouse_pos.y += window_y;
             }
             io.AddMouseSourceEvent(event->motion.which == SDL_TOUCH_MOUSEID ? ImGuiMouseSource_TouchScreen : ImGuiMouseSource_Mouse);
+            // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+            // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
+#ifdef __APPLE__
+            // Fix for high DPI mac
+            ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+            if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f
+                    && (SDL_GetWindowFlags(bd->Window) & SDL_WINDOW_ALLOW_HIGHDPI) != 0)
+            {
+                // The Framebuffer is scaled by an integer ceiling of the actual ratio, so 2.0 not 1.685 on Mac!
+                mouse_pos.x *= std::ceil(platform_io.Monitors[0].DpiScale);
+                mouse_pos.y *= std::ceil(platform_io.Monitors[0].DpiScale);
+            }
+#endif
             io.AddMousePosEvent(mouse_pos.x, mouse_pos.y);
             return true;
         }
@@ -481,12 +501,21 @@ static bool ImGui_ImplSDL3_Init(SDL_Window* window, SDL_Renderer* renderer, void
     // Check and store if we are on a SDL backend that supports global mouse position
     // ("wayland" and "rpi" don't support it, but we chose to use a white-list instead of a black-list)
     bool mouse_can_use_global_state = false;
+    bool mouse_can_capture = true;
 #if SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
     const char* sdl_backend = SDL_GetCurrentVideoDriver();
     const char* global_mouse_whitelist[] = { "windows", "cocoa", "x11", "DIVE", "VMAN" };
     for (int n = 0; n < IM_ARRAYSIZE(global_mouse_whitelist); n++)
         if (strncmp(sdl_backend, global_mouse_whitelist[n], strlen(global_mouse_whitelist[n])) == 0)
             mouse_can_use_global_state = true;
+
+    // 2024-05-18 (Christoph Neuhauser): Using SDL_CaptureMouse fails on Wayland with SDL error.
+    const char* mouse_can_capture_blacklist[] = {
+            "wayland"
+    };
+    for (int n = 0; n < IM_ARRAYSIZE(mouse_can_capture_blacklist); n++)
+        if (strncmp(sdl_backend, mouse_can_capture_blacklist[n], strlen(mouse_can_capture_blacklist[n])) == 0)
+            mouse_can_capture = false;
 #endif
 
     // Setup backend capabilities flags
@@ -505,6 +534,7 @@ static bool ImGui_ImplSDL3_Init(SDL_Window* window, SDL_Renderer* renderer, void
     // SDL on Linux/OSX doesn't report events for unfocused windows (see https://github.com/ocornut/imgui/issues/4960)
     // We will use 'MouseCanReportHoveredViewport' to set 'ImGuiBackendFlags_HasMouseHoveredViewport' dynamically each frame.
     bd->MouseCanUseGlobalState = mouse_can_use_global_state;
+    bd->MouseCanCapture = mouse_can_capture;
 #ifndef __APPLE__
     bd->MouseCanReportHoveredViewport = bd->MouseCanUseGlobalState;
 #else
@@ -524,15 +554,15 @@ static bool ImGui_ImplSDL3_Init(SDL_Window* window, SDL_Renderer* renderer, void
     bd->WantUpdateGamepadsList = true;
 
     // Load mouse cursors
-    bd->MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
-    bd->MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_TEXT);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeAll] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeEW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NESW_RESIZE);
-    bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NWSE_RESIZE);
-    bd->MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
-    bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NOT_ALLOWED);
+    //bd->MouseCursors[ImGuiMouseCursor_Arrow] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
+    //bd->MouseCursors[ImGuiMouseCursor_TextInput] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_TEXT);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeAll] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_MOVE);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNS] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NS_RESIZE);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeEW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_EW_RESIZE);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNESW] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NESW_RESIZE);
+    //bd->MouseCursors[ImGuiMouseCursor_ResizeNWSE] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NWSE_RESIZE);
+    //bd->MouseCursors[ImGuiMouseCursor_Hand] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
+    //bd->MouseCursors[ImGuiMouseCursor_NotAllowed] = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_NOT_ALLOWED);
 
     // Set platform dependent data in viewport
     // Our mouse update function expect PlatformHandle to be filled for the main viewport
@@ -615,8 +645,8 @@ void ImGui_ImplSDL3_Shutdown()
 
     if (bd->ClipboardTextData)
         SDL_free(bd->ClipboardTextData);
-    for (ImGuiMouseCursor cursor_n = 0; cursor_n < ImGuiMouseCursor_COUNT; cursor_n++)
-        SDL_DestroyCursor(bd->MouseCursors[cursor_n]);
+    //for (ImGuiMouseCursor cursor_n = 0; cursor_n < ImGuiMouseCursor_COUNT; cursor_n++)
+    //    SDL_DestroyCursor(bd->MouseCursors[cursor_n]);
     ImGui_ImplSDL3_CloseGamepads();
 
     io.BackendPlatformName = nullptr;
@@ -634,7 +664,9 @@ static void ImGui_ImplSDL3_UpdateMouseData()
     // We forward mouse input when hovered or captured (via SDL_EVENT_MOUSE_MOTION) or when focused (below)
 #if SDL_HAS_CAPTURE_AND_GLOBAL_MOUSE
     // SDL_CaptureMouse() let the OS know e.g. that our imgui drag outside the SDL window boundaries shouldn't e.g. trigger other operations outside
-    SDL_CaptureMouse(bd->MouseButtonsDown != 0);
+    if (bd->MouseCanCapture) {
+        SDL_CaptureMouse(bd->MouseButtonsDown != 0);
+    }
     SDL_Window* focused_window = SDL_GetKeyboardFocus();
     const bool is_app_focused = (focused_window && (bd->Window == focused_window || ImGui_ImplSDL3_GetViewportForWindowID(SDL_GetWindowID(focused_window)) != NULL));
 #else
@@ -668,6 +700,19 @@ static void ImGui_ImplSDL3_UpdateMouseData()
                 mouse_x -= window_x;
                 mouse_y -= window_y;
             }
+            // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+            // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
+#ifdef __APPLE__
+            // Fix for high DPI mac
+            ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+            if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f
+                    && (SDL_GetWindowFlags(bd->Window) & SDL_WINDOW_ALLOW_HIGHDPI) != 0)
+            {
+                // The Framebuffer is scaled by an integer ceiling of the actual ratio, so 2.0 not 1.685 on Mac!
+                mouse_x *= int(std::ceil(platform_io.Monitors[0].DpiScale));
+                mouse_y *= int(std::ceil(platform_io.Monitors[0].DpiScale));
+            }
+#endif
             io.AddMousePosEvent((float)mouse_x, (float)mouse_y);
         }
     }
@@ -695,22 +740,49 @@ static void ImGui_ImplSDL3_UpdateMouseCursor()
         return;
     ImGui_ImplSDL3_Data* bd = ImGui_ImplSDL3_GetBackendData();
 
+    // 2023-03-03 (Christoph Neuhauser): Set mouse cursor via sgl.
+    sgl::Window* window = sgl::AppSettings::get()->getMainWindow();
+
     ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
     if (io.MouseDrawCursor || imgui_cursor == ImGuiMouseCursor_None)
     {
         // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-        SDL_HideCursor();
+        //SDL_HideCursor();
+        window->setShowCursor(false);
     }
     else
     {
         // Show OS mouse cursor
-        SDL_Cursor* expected_cursor = bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow];
+        /*SDL_Cursor* expected_cursor = bd->MouseCursors[imgui_cursor] ? bd->MouseCursors[imgui_cursor] : bd->MouseCursors[ImGuiMouseCursor_Arrow];
         if (bd->MouseLastCursor != expected_cursor)
         {
             SDL_SetCursor(expected_cursor); // SDL function doesn't have an early out (see #6113)
             bd->MouseLastCursor = expected_cursor;
         }
-        SDL_ShowCursor();
+        SDL_ShowCursor();*/
+        sgl::CursorType cursorType = sgl::CursorType::DEFAULT;
+        if (imgui_cursor == ImGuiMouseCursor_TextInput) {
+            cursorType = sgl::CursorType::IBEAM;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeAll) {
+            cursorType = sgl::CursorType::SIZEALL;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNS) {
+            cursorType = sgl::CursorType::SIZENS;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeEW) {
+            cursorType = sgl::CursorType::SIZEWE;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNESW) {
+            cursorType = sgl::CursorType::SIZENESW;
+        } else if (imgui_cursor == ImGuiMouseCursor_ResizeNWSE) {
+            cursorType = sgl::CursorType::SIZENWSE;
+        } else if (imgui_cursor == ImGuiMouseCursor_Hand) {
+            cursorType = sgl::CursorType::HAND;
+        } else if (imgui_cursor == ImGuiMouseCursor_NotAllowed) {
+            cursorType = sgl::CursorType::NO;
+        }
+        if (bd->CurrentCursor != imgui_cursor) {
+            bd->CurrentCursor = imgui_cursor;
+            window->setCursorType(cursorType);
+        }
+        window->setShowCursor(true);
     }
 }
 
@@ -868,6 +940,19 @@ void ImGui_ImplSDL3_NewFrame()
     io.DisplaySize = ImVec2((float)w, (float)h);
     if (w > 0 && h > 0)
         io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
+
+    // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
+    // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L499
+#if defined(__APPLE__)
+    // On Apple, The window size is reported in Low DPI, even when running in high DPI mode
+    ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+    if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f && display_h != h
+            && (SDL_GetWindowFlags(bd->Window) & SDL_WINDOW_ALLOW_HIGHDPI) != 0)
+    {
+        io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+        io.DisplaySize = ImVec2((float)display_w, (float)display_h);
+    }
+#endif
 
     // Update monitors
     if (bd->WantUpdateMonitors)

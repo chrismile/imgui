@@ -419,6 +419,7 @@ void ImGui::BulletTextV(const char* fmt, va_list args)
 // - ArrowButton()
 // - CloseButton() [Internal]
 // - CollapseButton() [Internal]
+// - PlusButton() // NOTE(Felix): I Added this here
 // - GetWindowScrollbarID() [Internal]
 // - GetWindowScrollbarRect() [Internal]
 // - Scrollbar() [Internal]
@@ -903,6 +904,46 @@ bool ImGui::CollapseButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_no
     // Switch to moving the window after mouse is moved beyond the initial drag threshold
     if (IsItemActive() && IsMouseDragging(0))
         StartMouseMovingWindowOrNode(window, dock_node, true); // Undock from window/collapse menu button
+
+    return pressed;
+}
+
+bool ImGui::PlusButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_node)
+{
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+
+    ImRect bb(pos, pos + ImVec2(g.FontSize, g.FontSize) + g.Style.FramePadding * 2.0f);
+    ItemAdd(bb, id);
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held, ImGuiButtonFlags_None);
+
+    // Render
+    //bool is_dock_menu = (window->DockNodeAsHost && !window->Collapsed);
+    ImU32 bg_col = GetColorU32((held && hovered) ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+    ImU32 text_col = GetColorU32(ImGuiCol_Text);
+    ImVec2 center = bb.GetCenter();
+    if (hovered || held) {
+        window->DrawList->AddCircleFilled(center + ImVec2(0,-0.5f), g.FontSize * 0.5f + 1.0f, bg_col, 12);
+    }
+
+    {
+        ImVec2 p_min = bb.Min + g.Style.FramePadding;
+        float sz = g.FontSize;
+        ImU32 col = text_col;
+
+        // parameters for the "plus" symbol
+        const float padding   = 0.2f;
+        const float thickness = 0.15f;
+
+        window->DrawList->AddRectFilled(p_min + ImVec2(sz * padding, sz * (0.5f-thickness/2.0f)), p_min + ImVec2(sz * (1.0f - padding), sz * (0.5f+thickness/2.0f)), col);
+        window->DrawList->AddRectFilled(p_min + ImVec2(sz * (0.5f-thickness/2.0f), sz * padding), p_min + ImVec2(sz * (0.5f+thickness/2.0f), sz * (1.0f - padding)), col);
+    }
+
+    // Switch to moving the window after mouse is moved beyond the initial drag threshold
+    if (IsItemActive() && IsMouseDragging(0))
+        StartMouseMovingWindowOrNode(window, dock_node, true);
+
 
     return pressed;
 }
@@ -2497,7 +2538,8 @@ bool ImGui::DragBehaviorT(ImGuiDataType data_type, TYPE* v, float v_speed, const
     {
         // When using logarithmic sliders, we need to clamp to avoid hitting zero, but our choice of clamp value greatly affects slider precision. We attempt to use the specified precision to estimate a good lower bound.
         const int decimal_precision = is_floating_point ? ImParseFormatPrecision(format, 3) : 1;
-        logarithmic_zero_epsilon = ImPow(0.1f, (float)decimal_precision);
+        // TODO: Fix https://github.com/ocornut/imgui/issues/4341
+        logarithmic_zero_epsilon = ImPow(0.1f, (float)(decimal_precision == -1 ? DBL_DIG : decimal_precision));
 
         // Convert to parametric space, apply delta, convert back
         float v_old_parametric = ScaleRatioFromValueT<TYPE, SIGNEDTYPE, FLOATTYPE>(data_type, v_cur, v_min, v_max, is_logarithmic, logarithmic_zero_epsilon, zero_deadzone_halfsize);
@@ -3014,7 +3056,8 @@ bool ImGui::SliderBehaviorT(const ImRect& bb, ImGuiID id, ImGuiDataType data_typ
     {
         // When using logarithmic sliders, we need to clamp to avoid hitting zero, but our choice of clamp value greatly affects slider precision. We attempt to use the specified precision to estimate a good lower bound.
         const int decimal_precision = is_floating_point ? ImParseFormatPrecision(format, 3) : 1;
-        logarithmic_zero_epsilon = ImPow(0.1f, (float)decimal_precision);
+        // TODO: Fix https://github.com/ocornut/imgui/issues/4341
+        logarithmic_zero_epsilon = ImPow(0.1f, (float)(decimal_precision == -1 ? DBL_DIG : decimal_precision));
         zero_deadzone_halfsize = (style.LogSliderDeadzone * 0.5f) / ImMax(slider_usable_sz, 1.0f);
     }
 
