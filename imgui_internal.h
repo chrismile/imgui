@@ -1226,6 +1226,7 @@ enum ImGuiNextWindowDataFlags_
     ImGuiNextWindowDataFlags_HasViewport        = 1 << 11,
     ImGuiNextWindowDataFlags_HasDock            = 1 << 12,
     ImGuiNextWindowDataFlags_HasWindowClass     = 1 << 13,
+    ImGuiNextWindowDataFlags_HasTabbarMenu      = 1 << 31 // NOTE(Felix): I added this
 };
 
 // Storage for SetNexWindow** functions
@@ -1256,6 +1257,7 @@ struct ImGuiNextWindowData
     ImGuiWindowClass            WindowClass;
     ImVec2                      MenuBarOffsetMinVal;    // (Always on) This is not exposed publicly, so we don't clear it and it doesn't have a corresponding flag (could we? for consistency?)
     ImGuiWindowRefreshFlags     RefreshFlagsVal;
+    std::function<const char*()> TabbarMenu;
 
     ImGuiNextWindowData()       { memset(this, 0, sizeof(*this)); }
     inline void ClearFlags()    { HasFlags = ImGuiNextWindowDataFlags_None; }
@@ -2701,6 +2703,7 @@ struct IMGUI_API ImGuiWindowTempData
     ImGuiItemStatusFlags    ChildItemStatusFlags;
     ImGuiItemStatusFlags    DockTabItemStatusFlags;
     ImRect                  DockTabItemRect;
+    std::function<const char*()> TabbarMenu;
 
     // Local parameters stacks
     // We store the current settings outside of the vectors to increase memory locality (reduce cache misses). The vectors are rarely modified. Also it allows us to not heap allocate for short-lived windows which are not using those settings.
@@ -3763,6 +3766,8 @@ namespace ImGui
     IMGUI_API ImGuiID       GetWindowScrollbarID(ImGuiWindow* window, ImGuiAxis axis);
     IMGUI_API ImGuiID       GetWindowResizeCornerID(ImGuiWindow* window, int n); // 0..3: corners
     IMGUI_API ImGuiID       GetWindowResizeBorderID(ImGuiWindow* window, ImGuiDir dir);
+    // NOTE(Felix): I added the `PlusButton'
+    IMGUI_API bool          PlusButton(ImGuiID id, const ImVec2& pos, ImGuiDockNode* dock_node);
 
     // Widgets low-level behaviors
     IMGUI_API bool          ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags = 0);
