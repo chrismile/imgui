@@ -390,7 +390,7 @@ bool ImGui_ImplSDL3_ProcessEvent(const SDL_Event* event)
             io.AddMouseSourceEvent(event->motion.which == SDL_TOUCH_MOUSEID ? ImGuiMouseSource_TouchScreen : ImGuiMouseSource_Mouse);
             // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
             // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
-#ifdef __APPLE__
+/*#ifdef __APPLE__
             // Fix for high DPI mac
             ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
             if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f
@@ -400,7 +400,7 @@ bool ImGui_ImplSDL3_ProcessEvent(const SDL_Event* event)
                 mouse_pos.x *= std::ceil(platform_io.Monitors[0].DpiScale);
                 mouse_pos.y *= std::ceil(platform_io.Monitors[0].DpiScale);
             }
-#endif
+#endif*/
             io.AddMousePosEvent(mouse_pos.x, mouse_pos.y);
             return true;
         }
@@ -754,7 +754,7 @@ static void ImGui_ImplSDL3_UpdateMouseData()
             }
             // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
             // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L354
-#ifdef __APPLE__
+/*#ifdef __APPLE__
             // Fix for high DPI mac
             ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
             if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f
@@ -764,7 +764,7 @@ static void ImGui_ImplSDL3_UpdateMouseData()
                 mouse_x *= int(std::ceil(platform_io.Monitors[0].DpiScale));
                 mouse_y *= int(std::ceil(platform_io.Monitors[0].DpiScale));
             }
-#endif
+#endif*/
             io.AddMousePosEvent((float)mouse_x, (float)mouse_y);
         }
     }
@@ -1000,7 +1000,7 @@ void ImGui_ImplSDL3_NewFrame()
 
     // https://github.com/ocornut/imgui/issues/3757#issuecomment-800921198
     // https://github.com/cmaughan/sonic-pi/blob/b65f3c6bc6d070f69f2bffe5b1f9d7f78cb7149b/app/gui/imgui/backends/imgui_impl_sdl.cpp#L499
-    #if defined(__APPLE__)
+/*#if defined(__APPLE__)
     // On Apple, The window size is reported in Low DPI, even when running in high DPI mode
     ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
     if (!platform_io.Monitors.empty() && platform_io.Monitors[0].DpiScale > 1.0f && display_h != h
@@ -1009,7 +1009,7 @@ void ImGui_ImplSDL3_NewFrame()
         io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
         io.DisplaySize = ImVec2((float)display_w, (float)display_h);
     }
-#endif
+#endif*/
 
     // Update monitors
 #ifdef WIN32
